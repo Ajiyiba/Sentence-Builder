@@ -11,6 +11,18 @@ Clean project layout for submission and Git upload.
 - Database integration (`word`, `word_follows`, `imported_file`, `generated_sentence`)
 - Text datasets in `data/` for import testing
 
+## Database Connection Setup
+- Connection code location: `autocomplete-master/src/main/java/com/example/simple/DBConnection.java`
+- The app reads DB settings from environment variables:
+  - `SB_DB_URL`
+  - `SB_DB_USER`
+  - `SB_DB_PASSWORD`
+- Password input: set `SB_DB_PASSWORD` when you run the app (terminal command below), or add the same env vars in IntelliJ Run Configuration.
+- If env vars are not set, defaults are:
+  - URL: `jdbc:mysql://127.0.0.1:3306/sentence_builder`
+  - User: `root`
+  - Password: empty string (`""`)
+
 ## Run
 ```bash
 cd autocomplete-master
