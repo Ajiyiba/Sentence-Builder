@@ -4,7 +4,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Batch import coordinator used by the UI import tab.
+ */
 public final class DataImporter {
+    /**
+     * Progress callback for updating JavaFX task status.
+     */
     public interface ProgressCallback {
         void onProgress(double progress, String message);
     }
@@ -19,6 +25,7 @@ public final class DataImporter {
             return new BatchImportResult(0, 0, 0);
         }
 
+        // Pre-filter invalid paths so progress and totals stay accurate.
         List<Path> existing = new ArrayList<>();
         for (Path file : files) {
             if (file != null && java.nio.file.Files.exists(file) && java.nio.file.Files.isRegularFile(file)) {

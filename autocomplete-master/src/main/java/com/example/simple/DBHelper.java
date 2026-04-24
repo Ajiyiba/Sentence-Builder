@@ -12,6 +12,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Data access + model logic: schema setup, import persistence, generation, autocomplete, reports.
+ */
 public final class DBHelper {
     private static final Pattern WORD_PATTERN = Pattern.compile("[A-Za-z']+");
     private static final Random RANDOM = new Random();
@@ -41,6 +44,7 @@ public final class DBHelper {
 
     public static void initializeSchema() {
         try (Connection conn = DBConnection.getConnection(); Statement stmt = conn.createStatement()) {
+            // Core tables required by the project spec.
             stmt.executeUpdate("""
                     CREATE TABLE IF NOT EXISTS word (
                         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -93,6 +97,7 @@ public final class DBHelper {
             ensureColumn(conn, "generated_sentence", "algorithm", "VARCHAR(64) NOT NULL DEFAULT ''");
             ensureColumn(conn, "generated_sentence", "start_word", "VARCHAR(255) NULL");
 
+            // Backfill legacy column names so old databases still work with the new UI/report queries.
             if (hasColumn(conn, "generated_sentence", "algorithm_used")) {
                 try (Statement backfill = conn.createStatement()) {
                     backfill.executeUpdate(
@@ -117,6 +122,7 @@ public final class DBHelper {
         DatabaseMetaData metaData = conn.getMetaData();
         try (ResultSet rs = metaData.getColumns(conn.getCatalog(), null, table, column)) {
             if (rs.next()) {
+                // Column already exists; keep schema migration idempotent.
                 return;
             }
         }
@@ -138,6 +144,7 @@ public final class DBHelper {
         int words = 0;
 
         try (Connection conn = DBConnection.getConnection()) {
+            // Import one file as a single transaction to keep counts and transitions consistent.
             conn.setAutoCommit(false);
             try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(filePath))) {
                 String line;
@@ -191,6 +198,7 @@ public final class DBHelper {
             boolean isEnd = i == tokens.size() - 1;
             int currentId = upsertWord(conn, word, isStart, isEnd);
             if (previousId > 0) {
+                // Track adjacency for both generation and autocomplete suggestions.
                 upsertFollow(conn, previousId, currentId);
             }
             previousId = currentId;
@@ -255,6 +263,7 @@ public final class DBHelper {
         }
 
         List<String> words = new ArrayList<>();
+        // Avoid repeatedly traversing the same directed pair, which causes short loops.
         Set<String> usedEdges = new HashSet<>();
         words.add(normalizedStart);
         String current = normalizedStart;
@@ -315,6 +324,7 @@ public final class DBHelper {
             }
         }
 
+        // Fall back to full candidate list if filtering removes everything.
         List<Suggestion> source = filtered.isEmpty() ? candidates : filtered;
         return switch (algorithm) {
             case TOP_FREQUENCY -> source.get(0).word();
@@ -332,10 +342,12 @@ public final class DBHelper {
         String prev3 = words.get(size - 3);
         String prev1 = words.get(size - 1);
 
+        // Detect ABAB-style pattern at the tail, e.g., "to the to the".
         return nextWord.equals(prev3) && prev1.equals(prev2);
     }
 
     private static void saveGeneratedSentence(GenerationAlgorithm algorithm, String startWord, String sentence) {
+        // Write both old and new column names so mixed schemas keep accepting inserts.
         String sql = "INSERT INTO generated_sentence (algorithm, algorithm_used, start_word, starting_word, sentence_text) " +
                 "VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = DBConnection.getConnection();

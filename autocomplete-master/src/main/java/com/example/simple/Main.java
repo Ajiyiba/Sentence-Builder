@@ -22,6 +22,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * JavaFX entry point and UI workflow wiring for import/generate/autocomplete/report features.
+ */
 public class Main extends Application {
     private final TextArea importLogArea = new TextArea();
     private final ProgressBar importProgress = new ProgressBar(0);
@@ -148,6 +151,7 @@ public class Main extends Application {
 
     private void runImportTask(List<Path> files) {
         if (importRunning) {
+            // Guard against double-click imports that would start overlapping DB writes.
             importLogArea.appendText("Import is already running. Please wait.\n");
             return;
         }
@@ -287,6 +291,7 @@ public class Main extends Application {
     }
 
     private void scheduleAutocompleteRefresh() {
+        // Debounce typing so we do not hit the DB on every keystroke.
         autocompleteDebounce.stop();
         autocompleteDebounce.setOnFinished(e -> loadSuggestionsForLastWord(false));
         autocompleteDebounce.playFromStart();
@@ -322,13 +327,16 @@ public class Main extends Application {
         boolean endsWithDelimiter = text != null && (text.endsWith(" ") || text.endsWith(","));
 
         if (delimiterTriggered || endsWithDelimiter) {
+            // User finished a token; suggest followers for that completed token.
             return words.get(words.size() - 1);
         }
 
         if (words.size() >= 2) {
+            // User is mid-word; use the previous completed token as context.
             return words.get(words.size() - 2);
         }
 
+        // Single-word input without delimiter: only use it when fully typed.
         return trimmed.equals(words.get(0)) ? words.get(0) : null;
     }
 
@@ -338,6 +346,7 @@ public class Main extends Application {
         predictionButtons.clear();
         predictionBar.getChildren().clear();
 
+        // Fixed-size prediction strip similar to mobile keyboard next-word suggestions.
         for (int i = 0; i < 5; i++) {
             Button button = new Button();
             button.setVisible(false);

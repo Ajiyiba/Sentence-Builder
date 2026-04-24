@@ -4,6 +4,9 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+/**
+ * Quick CLI check for verifying DB connectivity and active schema/user.
+ */
 public class ConnectionCheck {
     public static void main(String[] args) {
         try (Connection conn = DBConnection.getConnection();
