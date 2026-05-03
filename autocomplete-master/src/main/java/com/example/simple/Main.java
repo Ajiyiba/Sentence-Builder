@@ -297,47 +297,44 @@ public class Main extends Application {
         autocompleteDebounce.playFromStart();
     }
 
+    /**
+     * Autocomplete: only after a full token (space/comma). Queries {@link DBHelper#getSuggestions}
+     * for next-word predictions from {@code word_follows}. While the user is still typing the
+     * current token we clear predictions (project rubric). Completed tokens are ensured in {@code word}
+     * via {@link DBHelper#addWordIfMissing} so new vocabulary is stored.
+     */
     private void loadSuggestionsForLastWord(boolean delimiterTriggered) {
         String text = composerArea.getText();
         List<String> words = DBHelper.extractWords(text);
         if (words.isEmpty()) {
             autocompleteStatus.setText("Type a word first.");
+            updatePredictionButtons(List.of());
             return;
         }
 
-        String contextWord = resolveContextWord(text, words, delimiterTriggered);
-        if (contextWord == null || contextWord.isBlank()) {
-            autocompleteStatus.setText("Type more words to get suggestions.");
-            return;
-        }
-
-        if (delimiterTriggered) {
-            DBHelper.addWordIfMissing(contextWord);
-        }
-
-        List<DBHelper.Suggestion> suggestions = DBHelper.getSuggestions(contextWord, 8);
-        updatePredictionButtons(suggestions);
-        autocompleteStatus.setText(suggestions.isEmpty()
-                ? "No suggestions for '" + contextWord + "'."
-                : "Suggestions loaded for '" + contextWord + "'.");
-    }
-
-    private String resolveContextWord(String text, List<String> words, boolean delimiterTriggered) {
-        String trimmed = text == null ? "" : text.trim();
-        boolean endsWithDelimiter = text != null && (text.endsWith(" ") || text.endsWith(","));
+        boolean endsWithDelimiter = text.endsWith(" ") || text.endsWith(",");
 
         if (delimiterTriggered || endsWithDelimiter) {
-            // User finished a token; suggest followers for that completed token.
-            return words.get(words.size() - 1);
+            String completedWord = words.get(words.size() - 1);
+            if (completedWord == null || completedWord.isBlank()) {
+                autocompleteStatus.setText("Type more words to get suggestions.");
+                updatePredictionButtons(List.of());
+                return;
+            }
+
+            DBHelper.addWordIfMissing(completedWord);
+
+            List<DBHelper.Suggestion> suggestions = DBHelper.getSuggestions(completedWord, 8);
+            updatePredictionButtons(suggestions);
+            autocompleteStatus.setText(suggestions.isEmpty()
+                    ? "No next-word suggestions for '" + completedWord + "'."
+                    : "Suggestions loaded for '" + completedWord + "'.");
+            return;
         }
 
-        if (words.size() >= 2) {
-            // User is mid-word; use the previous completed token as context.
-            return words.get(words.size() - 2);
-        }
-
-        // Single-word input without delimiter: only use it when fully typed.
-        return trimmed.equals(words.get(0)) ? words.get(0) : null;
+        // Project rubric: do not predict while user is still typing a word.
+        updatePredictionButtons(List.of());
+        autocompleteStatus.setText("Suggestions appear after space/comma.");
     }
 
     private void initializePredictionBar() {

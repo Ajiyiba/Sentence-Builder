@@ -205,6 +205,10 @@ public final class DBHelper {
         }
     }
 
+    /**
+     * Inserts the word into {@code word} if absent (counts stay zero until import/training updates them).
+     * Used when the user finishes typing a token so unknown words can be added per project requirements.
+     */
     public static void addWordIfMissing(String word) {
         String normalized = normalizeWord(word);
         if (normalized == null) {
